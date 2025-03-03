@@ -82,7 +82,9 @@ class Neighborgrid:
         #         raise ValueError("Particle is outside the set bounds")
 
         #vectorized version - reduces total runtime by about 10%
-        if ( (position < self.lim[:,0]).any() or (position >= self.lim[:,1]).any() ):
+        if ( (position < self.lim[:,0]).any() or (position > self.lim[:,1]).any() ):
+            print(self.lim)
+            print(position)
             raise ValueError("Particle is outside the set bounds")
 
         #convert to an index - tuple for use as key in map

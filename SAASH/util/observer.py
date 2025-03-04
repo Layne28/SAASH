@@ -39,8 +39,8 @@ class Observer:
         print("\nConstructing an Observer")
 
         #set the allowed run type options and corresponding outfile extensions
-        self.__allowed_run_types = ['bulk', 'nanoparticle', 'cluster']
-        self.__file_extensions   = {'bulk':'.sizes', 'nanoparticle':'.np', 'cluster':'.cl'}
+        self.__allowed_run_types = ['bulk', 'nanoparticle', 'cluster','capsid']
+        self.__file_extensions   = {'bulk':'.sizes', 'nanoparticle':'.np', 'cluster':'.cl', 'capsid':'.cap'}
 
         #init a set of observables to compute
         self.__observable_set = set()

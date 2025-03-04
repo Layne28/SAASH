@@ -417,7 +417,7 @@ def handle_nanoparticle(snaps, frames, sim, observer):
         #get the snapshot for the current frame
         snap = snaps[frame_num]
 
-        #get the cluster data for each nanpoparticle
+        #get the cluster data for each nanoparticle
         q = analyze_nano(snap, sim, observer)
         nano_data.append(q)
 
@@ -455,12 +455,134 @@ def write_nanoparticle_output(out_data, frames, observer):
     return
 
 
+def handle_capsids(snaps, frames, sim, observer, N_perfect, bond_perfect):
+    #identify perfect capsids
+
+    #init lists to store capsid bond size distribution
+    all_bonds   = []
+
+    print("\nBeginning Capsid Analysis")
+    jump = observer.get_frame_jump()
+
+    #loop over each frame and perform the analysis
+    for frame_num in range(observer.get_first_frame(), observer.get_final_frame(), jump):
+
+        print_progress(frame_num, observer)
+
+        #get the snapshot for the current frame
+        snap = snaps[frame_num]
+        
+        #get a list of bodies to analyze
+        bodies = body.create_bodies(snap, sim)
+        
+        #init a dict to store the bonds - init with empty lists for each body_id
+        bond_dict = dict()
+        for bod in bodies:
+            bond_dict[bod.get_id()] = []
+
+        #determine the bond network using the list of filtered bodies
+        body.get_bonded_bodies(bodies, sim, bond_dict)
+
+        #determine groups of bonded structures
+        G = cluster.get_groups(bond_dict)
+        
+        #print(bond_dict)
+        #print(G)
+        
+        G_lens = [len(G[i]) for i in range(len(G))]
+        print(G_lens)
+        
+        #get the number of bonds in the largest cluster
+        cluster_ids = [i for i, n in enumerate(G_lens) if n==N_perfect]
+        
+        bonds_list = []
+        if cluster_ids:
+            capsid_clusters = [G[i] for i in cluster_ids] #G[cluster_ids]
+            #print(capsid_clusters)
+            for c in capsid_clusters:
+                bonds = 0
+                for particle in c:
+                    bonds += len(bond_dict[particle])
+                #Correct for double counting
+                bonds = bonds//2
+                bonds_list.append(bonds)
+        
+        capsid_bond_dict = {}
+        for nbond in bonds_list:
+            if nbond not in capsid_bond_dict.keys():
+                capsid_bond_dict[nbond] = 1
+            else:
+                capsid_bond_dict[nbond] += 1
+        print(capsid_bond_dict)
+        
+        all_bonds.append(capsid_bond_dict)
+    
+    return all_bonds
+
+
+def write_capsids_output(bond_data, frames, observer, N_perfect, bond_perfect, jump = 1):
+    #print the capsid bond distribution to file in observer
+    
+    #number of bonds in perfect capsid (always an entry here)
+    n_bonds_perfect = N_perfect*bond_perfect//2
+
+    #extract the data from out data
+    all_sizes = set().union(*(d.keys() for d in bond_data))
+    print(all_sizes)
+    all_sizes.add(n_bonds_perfect)
+    print(all_sizes)
+    possible_bonds = list(all_sizes)#.sort()
+    possible_bonds.sort()
+    print(possible_bonds)
+    # max_bonds = max(all_sizes)
+    # min_bonds = min(all_sizes)
+
+    #get the output file name from observer and open it for writing
+    outfile = observer.get_outfile()
+    fout = open(outfile, 'w') 
+
+    #Header
+    myheader = "frame "
+    for key in possible_bonds:
+        myheader += "{} ".format(key)
+    
+    fout.write(myheader)
+    fout.write("\n")
+
+    #write the data
+    jump = observer.get_frame_jump()
+    frame_counter = 0
+    for frame_num in range(observer.get_first_frame(), observer.get_final_frame(), jump):
+        
+        new_dict = {}
+        for i in range(len(possible_bonds)):
+            if possible_bonds[i] in bond_data[frame_counter].keys():
+                new_dict[i] = bond_data[frame_counter][possible_bonds[i]]
+            else:
+                new_dict[i] = 0
+
+        #convert dict to cluster array
+        bond_size_array = [new_dict[i] for i in range(len(possible_bonds))] 
+
+        #write output
+        fout.write("{} ".format(frame_num))
+        for i in range(len(possible_bonds)):
+            fout.write("{} ".format(bond_size_array[i]))
+        fout.write("\n")
+
+        frame_counter += 1
+
+    #close the file
+    fout.close()
+    print("Capsid bond distribution written to file: {}".format(outfile))
+
+    return
 
 
 
 
 
-def run_analysis(gsd_file, ixn_file = "interactions.txt", observer = None):
+def run_analysis(gsd_file, ixn_file = "interactions.txt", observer = None, N_perfect=12, bond_per_subunit_perfect=5):
     #get number of monomers and dimers at each frame in the sim
 
     #get the collection of snapshots and get number of frames
@@ -500,6 +622,15 @@ def run_analysis(gsd_file, ixn_file = "interactions.txt", observer = None):
 
         out_data = handle_nanoparticle(snaps, frames, sim, observer)
         write_nanoparticle_output(out_data, frames, observer)
+        
+    #report number of assemblies with ideal number of subunits AND bonds
+    elif run_type == 'capsid':
 
+        out_data = handle_capsids(snaps, frames, sim, observer, N_perfect, bond_per_subunit_perfect)
+        write_capsids_output(out_data, frames, observer, N_perfect, bond_per_subunit_perfect)
+
+    else:
+        print('Error: type not recognized!')
+        exit()
 
     return 0

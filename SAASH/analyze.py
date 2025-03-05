@@ -606,7 +606,7 @@ def run_analysis(gsd_file, ixn_file = "interactions.txt", observer = None, N_per
 
     #get run type info from the observer
     run_type = observer.get_run_type()
-
+x
     #fork the analysis base don the run type
     if run_type == 'cluster':
 
